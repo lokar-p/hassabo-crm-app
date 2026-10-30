@@ -1,0 +1,244 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["hassabo_crm"]
+}
+
+enum UserRole {
+  ADMIN
+  BROKER
+  MANAGER
+  CUSTOMER
+
+  @@schema("hassabo_crm")
+}
+
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  VILLA
+  LAND
+  OFFICE
+  SHOP
+  WAREHOUSE
+  FARM
+
+  @@schema("hassabo_crm")
+}
+
+enum PropertyState {
+  SALE
+  RENT
+
+  @@schema("hassabo_crm")
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  RENTED
+
+  @@schema("hassabo_crm")
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("hassabo_crm")
+}
+
+model BrokerRegistering {
+  id           String  @id @default(cuid())
+  name         String
+  phoneNumber  String  @unique
+  isRegistered Boolean @default(false)
+  officeId     String
+  office       Office  @relation(fields: [officeId], references: [id])
+
+  user User?
+
+  registeredAT DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String?
+  email        String?  @unique
+  phoneNumber  String   @unique
+  passwordHash String
+  role         UserRole
+
+  // Relations
+  brokerId        String?            @unique
+  broker          BrokerRegistering? @relation(fields: [brokerId], references: [id])
+  addedProperties Property[]
+  assignedOwners  Owner[]
+  listings        Listing[]
+  sessions        Session[]
+  officeId        String?
+  office          Office?            @relation(fields: [officeId], references: [id])
+  managedOffice   Office?            @relation("officeManager")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiredAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@schema("hassabo_crm")
+}
+
+model Office {
+  id String @id @default(cuid())
+
+  name String
+
+  address String
+
+  // Relations
+  registeredBroker BrokerRegistering[]
+  broker           User[]
+  officeManager    User?               @relation("officeManager", fields: [managerId], references: [id])
+  managerId        String?             @unique
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model Owner {
+  id          String  @id @default(cuid())
+  name        String
+  email       String? @unique
+  phoneNumber String  @unique
+  notes       String?
+
+  // Assigned broker/employee
+  brokerId String
+  broker   User   @relation(fields: [brokerId], references: [id])
+
+  // Relations
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model Location {
+  id String @id @default(cuid())
+
+  city         String
+  locality     String
+  neighborhood String
+  block        Int
+
+  properties Property[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model Property {
+  id String @id @default(cuid())
+
+  ownerId     String
+  locationId  String
+  createdById String
+
+  owner     Owner    @relation(fields: [ownerId], references: [id])
+  location  Location @relation(fields: [locationId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  propertyNumber String?
+
+  type   PropertyType
+  state  PropertyState
+  status PropertyStatus
+
+  price Float
+  space Float
+
+  latitude  Float?
+  longitude Float?
+
+  description String?
+  notes       String?
+
+  // Relations
+  listing Listing?
+  images  PropertyImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model Listing {
+  id String @id @default(cuid())
+
+  propertyId String @unique
+  listedById String
+
+  property Property @relation(fields: [propertyId], references: [id])
+  listedBy User     @relation(fields: [listedById], references: [id])
+
+  title       String
+  description String?
+
+  status   ListingStatus @default(DRAFT)
+  isActive Boolean       @default(true)
+
+  notes       String?
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
+
+model PropertyImage {
+  id String @id @default(cuid())
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  imageUrl String
+
+  sortOrder Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("hassabo_crm")
+}
